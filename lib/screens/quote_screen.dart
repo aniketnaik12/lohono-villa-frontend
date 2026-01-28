@@ -51,7 +51,6 @@ class _QuoteScreenState extends State<QuoteScreen> {
       backgroundColor: const Color(0xFFF6F6F6),
       body: CustomScrollView(
         slivers: [
-          // 🖼 Image header
           SliverAppBar(
             expandedHeight: 240,
             pinned: true,
