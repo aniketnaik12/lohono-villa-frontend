@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 
 class QuoteScreen extends StatefulWidget {
@@ -36,6 +37,17 @@ class _QuoteScreenState extends State<QuoteScreen> {
     setState(() => loading = false);
   }
 
+  String formatDate(DateTime date) {
+    return DateFormat('dd MMM yyyy').format(date);
+  }
+
+  String formatRange(DateTime start, DateTime end) {
+    if (start.month == end.month && start.year == end.year) {
+      return '${DateFormat('dd').format(start)}–${DateFormat('dd MMM yyyy').format(end)}';
+    }
+    return '${formatDate(start)} – ${formatDate(end)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     if (loading) {
@@ -46,6 +58,9 @@ class _QuoteScreenState extends State<QuoteScreen> {
 
     final villa = data!['villa'];
     final breakdown = data!['nightly_breakdown'];
+
+    final checkInDate = DateTime.parse(widget.checkIn);
+    final checkOutDate = DateTime.parse(widget.checkOut);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F6F6),
@@ -69,9 +84,20 @@ class _QuoteScreenState extends State<QuoteScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // 📍 Location
                   Text(
                     villa['location'],
                     style: TextStyle(color: Colors.grey.shade600),
+                  ),
+
+                  const SizedBox(height: 6),
+
+                  Text(
+                    formatRange(checkInDate, checkOutDate),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
 
                   const SizedBox(height: 12),
@@ -88,20 +114,25 @@ class _QuoteScreenState extends State<QuoteScreen> {
                   ),
 
                   const SizedBox(height: 20),
+
                   const Text(
                     'Price Breakdown',
-                    style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
 
                   const SizedBox(height: 10),
                   ...breakdown.map<Widget>((n) {
+                    final date =
+                        formatDate(DateTime.parse(n['date']));
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 6),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(n['date']),
+                          Text(date),
                           Text('₹${n['rate']}'),
                         ],
                       ),
