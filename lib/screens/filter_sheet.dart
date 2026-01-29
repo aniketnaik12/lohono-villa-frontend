@@ -1,11 +1,22 @@
 import 'package:flutter/material.dart';
+class FilterResult {
+  final List<String> tags;
+  final RangeValues? priceRange;
+
+  FilterResult({
+    required this.tags,
+    required this.priceRange,
+  });
+}
 
 class FilterSheet extends StatefulWidget {
   final List<String> selectedTags;
+  final RangeValues? priceRange;
 
   const FilterSheet({
     super.key,
     required this.selectedTags,
+    this.priceRange,
   });
 
   @override
@@ -13,22 +24,14 @@ class FilterSheet extends StatefulWidget {
 }
 
 class _FilterSheetState extends State<FilterSheet> {
-  late List<String> _tags;
+  late List<String> tags;
+  late RangeValues range;
 
   @override
   void initState() {
     super.initState();
-    _tags = List.from(widget.selectedTags);
-  }
-
-  void toggleTag(String tag) {
-    setState(() {
-      if (_tags.contains(tag)) {
-        _tags.remove(tag);
-      } else {
-        _tags.add(tag);
-      }
-    });
+    tags = [...widget.selectedTags];
+    range = widget.priceRange ?? const RangeValues(30000, 60000);
   }
 
   @override
@@ -51,23 +54,30 @@ class _FilterSheetState extends State<FilterSheet> {
 
           const SizedBox(height: 16),
 
-          const Text('Price Range'),
+          // 💰 Price range
+          const Text('Price per night'),
           RangeSlider(
-            values: const RangeValues(30000, 60000),
+            values: range,
             min: 20000,
             max: 80000,
-            onChanged: (_) {},
+            divisions: 12,
+            labels: RangeLabels(
+              '₹${range.start.toInt()}',
+              '₹${range.end.toInt()}',
+            ),
+            onChanged: (v) => setState(() => range = v),
           ),
 
           const SizedBox(height: 12),
-          const Text('Tags'),
 
+          // 🏷 Tags
+          const Text('Tags'),
           Wrap(
             spacing: 8,
             children: [
-              _buildChip('Pet-friendly'),
-              _buildChip('Event-friendly'),
-              _buildChip('Senior-friendly'),
+              _chip('Pet-friendly'),
+              _chip('Event-friendly'),
+              _chip('Senior-friendly'),
             ],
           ),
 
@@ -77,29 +87,48 @@ class _FilterSheetState extends State<FilterSheet> {
             children: [
               TextButton(
                 onPressed: () {
-                  setState(() => _tags.clear());
+                  Navigator.pop(
+                    context,
+                    FilterResult(
+                      tags: [],
+                      priceRange: null,
+                    ),
+                  );
                 },
                 child: const Text('Clear'),
               ),
+
               const Spacer(),
+
               ElevatedButton(
                 onPressed: () {
-                  Navigator.pop(context, _tags);
+                  Navigator.pop(
+                    context,
+                    FilterResult(
+                      tags: tags,
+                      priceRange: range,
+                    ),
+                  );
                 },
                 child: const Text('Apply'),
               ),
             ],
-          )
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildChip(String label) {
+  Widget _chip(String tag) {
+    final selected = tags.contains(tag);
     return FilterChip(
-      label: Text(label),
-      selected: _tags.contains(label),
-      onSelected: (_) => toggleTag(label),
+      label: Text(tag),
+      selected: selected,
+      onSelected: (v) {
+        setState(() {
+          v ? tags.add(tag) : tags.remove(tag);
+        });
+      },
     );
   }
 }

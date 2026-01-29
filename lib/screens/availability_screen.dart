@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../widgets/villa_card.dart';
-import 'quote_screen.dart';
 import '../widgets/search_summary.dart';
 import '../widgets/filter_sort_bar.dart';
+
+import 'quote_screen.dart';
 import 'filter_sheet.dart';
 import 'sort_sheet.dart';
 
@@ -26,27 +27,36 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
   String sort = 'avg_price_per_night';
   String order = 'ASC';
 
-  DateTime? checkIn;
-  DateTime? checkOut;
+  RangeValues? priceRange;
+
+  // Default dates (auto-load)
+  DateTime? checkIn = DateTime(2025, 1, 5);
+  DateTime? checkOut = DateTime(2025, 1, 10);
 
   String _fmt(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-  Future<void> pickDates() async {
-  final result = await showDateRangePicker(
-    context: context,
-    firstDate: DateTime(2025, 1, 1),
-    lastDate: DateTime(2025, 12, 31),
-  );
-
-  if (result != null) {
-    setState(() {
-      checkIn = result.start;
-      checkOut = result.end;
-    });
+  @override
+  void initState() {
+    super.initState();
     load();
   }
-}
+
+  Future<void> pickDates() async {
+    final result = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2025, 1, 1),
+      lastDate: DateTime(2025, 12, 31),
+    );
+
+    if (result != null) {
+      setState(() {
+        checkIn = result.start;
+        checkOut = result.end;
+      });
+      load();
+    }
+  }
 
   void openSearchOptions() {
     showModalBottomSheet(
@@ -68,10 +78,8 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                 'Edit Search',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
               ),
-
               const SizedBox(height: 16),
 
-              // Location
               ListTile(
                 leading: const Icon(Icons.location_on),
                 title: const Text('Location'),
@@ -86,12 +94,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                   if (result != null) {
                     setState(() {
                       selectedLocation = result;
-
-                      if (result == 'All') {
-                        searchQuery = null; // remove filter
-                      } else {
-                        searchQuery = result; // apply filter
-                      }
+                      searchQuery = result == 'All' ? null : result;
                     });
                     load();
                   }
@@ -103,9 +106,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                 leading: const Icon(Icons.date_range),
                 title: const Text('Dates'),
                 subtitle: Text(
-                  checkIn == null
-                      ? 'Add dates'
-                      : '${_fmt(checkIn!)} → ${_fmt(checkOut!)}',
+                  '${_fmt(checkIn!)} → ${_fmt(checkOut!)}',
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -119,9 +120,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
     );
   }
 
-  // -------------------------
   // API call
-  // -------------------------
   Future<void> load() async {
     if (checkIn == null || checkOut == null) return;
 
@@ -134,7 +133,8 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
         tags: selectedTags,
         sort: sort,
         order: order,
-        // location can be passed later if backend supports it
+        minPrice: priceRange?.start.toInt(),
+        maxPrice: priceRange?.end.toInt(),
       );
     } catch (e) {
       debugPrint('Availability error: $e');
@@ -142,39 +142,40 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
     setState(() => loading = false);
   }
 
-  // -------------------------
   // UI
-  // -------------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF6F6F6),
       appBar: AppBar(
-        title: Text(
-          selectedLocation == 'All' ? 'All Locations' : selectedLocation,
-        ),
+        title:
+            Text(selectedLocation == 'All' ? 'All Locations' : selectedLocation),
         elevation: 0,
       ),
       body: Column(
         children: [
-          // 🔎 Search summary
           SearchSummary(
-            label: checkIn == null
-                ? '${selectedLocation == 'All' ? 'All Locations' : selectedLocation} · Add Date · Add Guests'
-                : '${selectedLocation == 'All' ? 'All Locations' : selectedLocation} · ${_fmt(checkIn!)} → ${_fmt(checkOut!)}',
+            label:
+                '${selectedLocation == 'All' ? 'All Locations' : selectedLocation} · ${_fmt(checkIn!)} → ${_fmt(checkOut!)}',
             onTap: openSearchOptions,
           ),
 
           FilterSortBar(
             onFilterTap: () async {
-              final result = await showModalBottomSheet<List<String>>(
+              final result = await showModalBottomSheet<FilterResult>(
                 context: context,
                 isScrollControlled: true,
-                builder: (_) => FilterSheet(selectedTags: selectedTags),
+                builder: (_) => FilterSheet(
+                  selectedTags: selectedTags,
+                  priceRange: priceRange,
+                ),
               );
 
               if (result != null) {
-                setState(() => selectedTags = result);
+                setState(() {
+                  selectedTags = result.tags;
+                  priceRange = result.priceRange;
+                });
                 load();
               }
             },
@@ -197,7 +198,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
           Padding(
             padding: const EdgeInsets.all(16),
             child: Text(
-              'Luxury villas in $selectedLocation · ${villas.length} properties found',
+              'Luxury villas · ${villas.length} properties found',
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
@@ -205,36 +206,35 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
           Expanded(
             child: loading
                 ? const Center(child: CircularProgressIndicator())
-                : checkIn == null
-                ? const Center(child: Text('Select dates to view availability'))
                 : villas.isEmpty
-                ? const Center(
-                    child: Text(
-                      'No villas available for selected dates or filters',
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: villas.length,
-                    itemBuilder: (context, index) {
-                      final v = villas[index];
-                      return VillaCard(
-                        villa: v,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => QuoteScreen(
-                                villaId: v['id'],
-                                checkIn: _fmt(checkIn!),
-                                checkOut: _fmt(checkOut!),
-                              ),
-                            ),
+                    ? const Center(
+                        child: Text(
+                          'No villas available for selected filters',
+                        ),
+                      )
+                    : ListView.builder(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: villas.length,
+                        itemBuilder: (context, index) {
+                          final v = villas[index];
+                          return VillaCard(
+                            villa: v,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => QuoteScreen(
+                                    villaId: v['id'],
+                                    checkIn: _fmt(checkIn!),
+                                    checkOut: _fmt(checkOut!),
+                                  ),
+                                ),
+                              );
+                            },
                           );
                         },
-                      );
-                    },
-                  ),
+                      ),
           ),
         ],
       ),
@@ -256,9 +256,8 @@ class LocationSheet extends StatelessWidget {
           return ListTile(
             leading: const Icon(Icons.location_on),
             title: Text(location),
-            trailing: location == selectedLocation
-                ? const Icon(Icons.check)
-                : null,
+            trailing:
+                location == selectedLocation ? const Icon(Icons.check) : null,
             onTap: () => Navigator.pop(context, location),
           );
         }).toList(),
