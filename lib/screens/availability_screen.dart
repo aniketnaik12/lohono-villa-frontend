@@ -47,6 +47,9 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
       context: context,
       firstDate: DateTime(2025, 1, 1),
       lastDate: DateTime(2025, 12, 31),
+      initialDateRange: checkIn != null && checkOut != null
+          ? DateTimeRange(start: checkIn!, end: checkOut!)
+          : null,
     );
 
     if (result != null) {
@@ -91,11 +94,13 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                         LocationSheet(selectedLocation: selectedLocation),
                   );
 
-                  if (result != null) {
+                  if (result != null && result != selectedLocation) {
                     setState(() {
                       selectedLocation = result;
                       searchQuery = result == 'All' ? null : result;
                     });
+                    Navigator.pop(context);
+
                     load();
                   }
                 },
